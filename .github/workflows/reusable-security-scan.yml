@@ -11,10 +11,15 @@ on:
         description: "Severidad mínima que bloquea el pipeline"
         type: string
         default: "CRITICAL"
+      environment:
+        description: "Ambiente de GitHub usado para autenticarse contra Azure/ACR al escanear la imagen con Trivy"
+        type: string
+        default: ""
 
 permissions:
   contents: read
   security-events: write
+  id-token: write
 
 jobs:
   codeql:
@@ -39,9 +44,20 @@ jobs:
   container-scan:
     if: inputs.image-ref != ''
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR (necesario para que Trivy pueda descargar la imagen)
+        run: az acr login --name $(echo "${{ inputs.image-ref }}" | cut -d'/' -f1 | cut -d'.' -f1)
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
