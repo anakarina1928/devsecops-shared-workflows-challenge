@@ -1,0 +1,67 @@
+name: Reusable - Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      image-ref:
+        description: "Referencia de la imagen Docker a escanear con Trivy (ej. myimage:tag). Si está vacío, se omite el scan de contenedor."
+        type: string
+        default: ""
+      severity-gate:
+        description: "Severidad mínima que bloquea el pipeline"
+        type: string
+        default: "CRITICAL"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        with:
+          languages: java
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        with:
+          category: "/language:java"
+
+  container-scan:
+    if: inputs.image-ref != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@6c175e9c40f3f5f0a99a3b17e3c95d0f5b6c7f0c # 0.24.0
+        with:
+          image-ref: ${{ inputs.image-ref }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Security Gate - fail on critical vulnerabilities
+        uses: aquasecurity/trivy-action@6c175e9c40f3f5f0a99a3b17e3c95d0f5b6c7f0c # 0.24.0
+        with:
+          image-ref: ${{ inputs.image-ref }}
+          format: "table"
+          severity: ${{ inputs.severity-gate }}
+          exit-code: "1"
+          ignore-unfixed: true

@@ -1,0 +1,22 @@
+name: "Vault Secrets Inject"
+description: "Obtiene un secreto desde HashiCorp Vault (auth JWT/OIDC) y lo expone como variable de entorno enmascarada para los pasos siguientes del job"
+author: "devsecops-challenge"
+
+inputs:
+  vault-addr:
+    description: "URL del servidor de Vault"
+    required: true
+  vault-role:
+    description: "Rol configurado en el auth method JWT/OIDC de Vault"
+    required: true
+  secret-path:
+    description: "Ruta del secreto en Vault (ej. secret/data/microservicio/dev)"
+    required: true
+  env-var-name:
+    description: "Nombre de la variable de entorno donde se expondrá el valor del secreto"
+    required: true
+    default: "APP_SECRET"
+
+runs:
+  using: "node20"
+  main: "index.js"

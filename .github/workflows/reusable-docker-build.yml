@@ -1,0 +1,64 @@
+name: Reusable - Docker Build and Push to ACR
+
+on:
+  workflow_call:
+    inputs:
+      registry:
+        description: "Hostname del Azure Container Registry (ej. miacr.azurecr.io)"
+        type: string
+        required: true
+      image-name:
+        description: "Nombre de la imagen (sin registry ni tag)"
+        type: string
+        required: true
+      image-tag:
+        description: "Tag de la imagen (ej. sha corto o versión semántica)"
+        type: string
+        required: true
+      dockerfile-path:
+        description: "Ruta al Dockerfile"
+        type: string
+        default: "."
+    outputs:
+      full-image-ref:
+        description: "Referencia completa de la imagen publicada"
+        value: ${{ jobs.build-push.outputs.image-ref }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-ref: ${{ steps.set-output.outputs.image-ref }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebafae4b1 # v2.1.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name $(echo "${{ inputs.registry }}" | cut -d'.' -f1)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@2b51285047da1547ffb1b2203d8be4c0af6b1f20 # v3.3.0
+
+      - name: Build and push image
+        uses: docker/build-push-action@ca877d9245402d1537745e2c4a06c0af1f0c1c6 # v5.3.0
+        with:
+          context: ${{ inputs.dockerfile-path }}
+          push: true
+          tags: ${{ inputs.registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set output
+        id: set-output
+        run: echo "image-ref=${{ inputs.registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}" >> "$GITHUB_OUTPUT"
