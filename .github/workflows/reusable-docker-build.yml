@@ -23,10 +23,10 @@ on:
         description: "Ambiente de GitHub (dev, qa, prod) usado para resolver la Federated Credential de OIDC"
         type: string
         required: true
-      outputs:
-        full-image-ref:
-          description: "Referencia completa de la imagen publicada"
-          value: ${{ jobs.build-push.outputs.image-ref }}
+    outputs:
+      full-image-ref:
+        description: "Referencia completa de la imagen publicada"
+        value: ${{ jobs.build-push.outputs.image-ref }}
 
 permissions:
   contents: read
