@@ -21,18 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
           languages: java
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        uses: github/codeql-action/autobuild@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
           category: "/language:java"
 
@@ -41,10 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@6c175e9c40f3f5f0a99a3b17e3c95d0f5b6c7f0c # 0.24.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ inputs.image-ref }}
           format: "sarif"
@@ -53,12 +53,12 @@ jobs:
           exit-code: "0"
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@012739e5082ff0c22ca6d6ab32e07c36df03c4a4 # v3.25.0
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: Security Gate - fail on critical vulnerabilities
-        uses: aquasecurity/trivy-action@6c175e9c40f3f5f0a99a3b17e3c95d0f5b6c7f0c # 0.24.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ inputs.image-ref }}
           format: "table"
