@@ -1,0 +1,19 @@
+name: "Azure Key Vault Secret Fetch"
+description: "Obtiene un secreto de Azure Key Vault (usando la sesion de az CLI ya autenticada via OIDC en un paso previo) y lo expone, enmascarado, como output para los pasos siguientes"
+author: "devsecops-challenge"
+
+inputs:
+  keyvault-name:
+    description: "Nombre del Azure Key Vault"
+    required: true
+  secret-name:
+    description: "Nombre del secreto dentro del Key Vault"
+    required: true
+
+outputs:
+  secret-value:
+    description: "El valor del secreto obtenido (enmascarado en los logs)"
+
+runs:
+  using: "node20"
+  main: "index.js"

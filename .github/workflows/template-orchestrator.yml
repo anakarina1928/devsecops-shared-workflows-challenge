@@ -1,13 +1,5 @@
-name: "Template: Orchestrator (Pipeline Completo)"
+name: "Template: Orchestrator"
 
-# Este es el UNICO workflow que los repos de microservicios deben llamar.
-# Encadena, en orden: preflight -> build-test -> docker-build -> security-scan -> deploy.
-#
-# El tipo de escaneo de seguridad se decide AQUI, segun el ambiente, para que
-# los repos de microservicios no necesiten ninguna logica propia al respecto:
-#   dev  -> SAST (CodeQL)
-#   qa   -> Container Scan (Trivy)
-#   prod -> sin escaneo (se reutiliza la imagen ya validada en dev y qa)
 on:
   workflow_call:
     inputs:
