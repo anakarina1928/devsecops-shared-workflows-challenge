@@ -1,0 +1,111 @@
+name: "Template: Security Scan"
+
+# El tipo de escaneo que corre depende del ambiente (optimizacion de tiempo,
+# patron "build once, scan appropriately, promote everywhere"):
+#   scan-type: sast      -> corre CodeQL (dev / rama develop)
+#   scan-type: container -> corre Trivy sobre la imagen (qa / rama release)
+#   scan-type: none      -> no corre ningun escaneo (prod / rama main,
+#                           ya que la imagen promovida a prod es la MISMA
+#                           que ya paso SAST en dev y Container Scan en qa;
+#                           volver a escanear los mismos bytes no aporta
+#                           seguridad adicional, solo tiempo de pipeline)
+on:
+  workflow_call:
+    inputs:
+      scan-type:
+        description: "Tipo de escaneo a ejecutar: sast | container | none"
+        type: string
+        required: true
+      image-ref:
+        description: "Referencia de la imagen Docker a escanear con Trivy (solo aplica si scan-type=container)"
+        type: string
+        default: ""
+      severity-gate:
+        description: "Severidad minima que bloquea el pipeline"
+        type: string
+        default: "CRITICAL"
+      environment:
+        description: "Ambiente de GitHub usado para autenticarse contra Azure/ACR al escanear con Trivy"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+
+jobs:
+  sast-codeql:
+    name: "SAST - Analizando codigo estatico con CodeQL"
+    if: inputs.scan-type == 'sast'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Descargando el codigo fuente del repositorio"
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: "Inicializando CodeQL"
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          languages: java
+
+      - name: "Compilando el proyecto para el analisis"
+        uses: github/codeql-action/autobuild@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+
+      - name: "Ejecutando el analisis SAST"
+        uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          category: "/language:java"
+
+  container-scan-trivy:
+    name: "Container Scan - Escaneando la imagen Docker con Trivy"
+    if: inputs.scan-type == 'container'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: "Descargando el codigo fuente del repositorio"
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: "Autenticando contra Azure via OIDC"
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: "Iniciando sesion en ACR (necesario para que Trivy descargue la imagen)"
+        run: az acr login --name $(echo "${{ inputs.image-ref }}" | cut -d'/' -f1 | cut -d'.' -f1)
+
+      - name: "Escaneando vulnerabilidades con Trivy (reporte completo)"
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ inputs.image-ref }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"
+
+      - name: "Publicando resultados de Trivy en la pestaña Security"
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: "Security Gate - bloqueando si hay vulnerabilidades criticas"
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ inputs.image-ref }}
+          format: "table"
+          severity: ${{ inputs.severity-gate }}
+          exit-code: "1"
+          ignore-unfixed: true
+
+  scan-omitido:
+    name: "Sin escaneo en este ambiente (imagen ya validada en dev/qa)"
+    if: inputs.scan-type == 'none'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Informando por que no se ejecuta escaneo aqui"
+        run: |
+          echo "No se ejecuta escaneo de seguridad en este ambiente."
+          echo "La imagen que se promueve a este ambiente ya fue validada"
+          echo "previamente: SAST (CodeQL) en dev y Container Scan (Trivy) en qa."
+          echo "Se reutiliza el mismo artefacto ya escaneado (build once, promote everywhere)."

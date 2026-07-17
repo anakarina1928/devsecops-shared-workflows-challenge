@@ -1,10 +1,10 @@
-name: Reusable - Deploy to AKS
+name: "Template: Deploy to AKS"
 
 on:
   workflow_call:
     inputs:
       environment:
-        description: "Ambiente de destino (dev, staging, prod)"
+        description: "Ambiente de destino (dev, qa, prod)"
         type: string
         required: true
       namespace:
@@ -38,34 +38,37 @@ permissions:
 
 jobs:
   deploy:
+    name: "Desplegando microservicio en AKS (namespace: ${{ inputs.namespace }})"
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
-      - name: Checkout code
+      - name: "Descargando el codigo fuente (incluye el Helm chart)"
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - name: Azure login (OIDC)
+      - name: "Autenticando contra Azure via OIDC"
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Set AKS context
+      - name: "Configurando el contexto del cluster AKS"
         uses: azure/aks-set-context@c7eb093e5a5d47caa333f64974d5fd1cd4bf069d # v4.0.3
         with:
           resource-group: ${{ inputs.resource-group }}
           cluster-name: ${{ inputs.aks-cluster-name }}
           admin: 'true'
-          
-      - name: Set up Helm
+
+      - name: "Instalando Helm"
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
 
-      - name: Ensure namespace exists
+      - name: "Creando el namespace si no existe (${{ inputs.namespace }})"
         run: kubectl create namespace ${{ inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy with Helm
+      - name: "Desplegando con Helm (helm upgrade --install)"
         run: |
+          echo "Desplegando imagen: ${{ inputs.image-ref }}"
+          echo "Ambiente: ${{ inputs.environment }} | Namespace: ${{ inputs.namespace }}"
           helm upgrade --install ${{ inputs.helm-release-name }} ${{ inputs.helm-chart-path }} \
             --namespace ${{ inputs.namespace }} \
             --set image.repository=$(echo "${{ inputs.image-ref }}" | cut -d':' -f1) \
@@ -73,5 +76,5 @@ jobs:
             --set environment=${{ inputs.environment }} \
             --wait --timeout 5m
 
-      - name: Verify rollout
+      - name: "Verificando que el rollout se complete correctamente"
         run: kubectl rollout status deployment/${{ inputs.helm-release-name }} -n ${{ inputs.namespace }} --timeout=120s
